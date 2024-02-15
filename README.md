@@ -1,6 +1,6 @@
 # excel-labs-gists
 
-This is the source repository for the following Gists:
+This is the source repository for the following gists:
 
 |Title|Description|
 |-|-|
