@@ -1,0 +1,14 @@
+/*
+fnTest v0.0.1 - TEST GIST
+GIST: https://gist.github.com/BakedPinata/d8e03381991e154c1271b03135ab94ff
+REPOSITORY: https://github.com/BakedPinata/excel-labs-gists
+AUTHOR: @BakedPinata
+TESTED: Microsoft Excel v2308
+*/
+
+MYLOOKUP = LAMBDA(lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode],
+    LET(
+        X, XLOOKUP(lookup_value, lookup_array, return_array, if_not_found, match_mode, search_mode),
+        IF(LEN(X)=0,"",X)
+    )
+);

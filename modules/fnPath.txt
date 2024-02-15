@@ -1,0 +1,329 @@
+/*
+fnCMC v0.1.0 - FILE & FOLDER PATH UTILITY FUNCTIONS
+GIST: https://gist.github.com/BakedPinata/50da565e21e6070802860bde266615c2s
+REPOSITORY: https://github.com/BakedPinata/excel-labs-gists
+AUTHOR: @BakedPinata
+TESTED: Microsoft Excel v2308
+*/
+
+/**
+ * @module fnPath
+ * @function AppendArray
+ * @brief Appends a prefix to specified elements in a given array based on provided row and column indices.
+ *
+ * This lambda function takes an array and a prefix string, appending the prefix to array elements
+ * that correspond to specified row and column indices. If row or column indices are omitted, the prefix
+ * is appended to the first row and column by default.
+ *
+ * @param array The array of strings to which the prefix will be appended.
+ * @param append_prefix The prefix string to append to the array elements.
+ * @param [array_row_index] (Optional) An array of row indices where the prefix will be appended. Defaults to {1}.
+ * @param [array_column_index] (Optional) An array of column indices where the prefix will be appended. Defaults to {1}.
+ *
+ * @return An array with the prefix appended to specified elements.
+ *
+ * @note The function uses the MAKEARRAY, MAP, and IF functions to create a new array with the prefix applied.
+ *
+ * @example
+ * // Appends "S" to the first row and column of a 3x3 array containing "1":
+ * =fnPath.AppendArray(MAKEARRAY(3,3,LAMBDA(r,c,"1")), "S")
+ * // Output: {"S1","1","1";"1","1","1";"1","1","1"}
+ */
+AppendArray = LAMBDA(array, append_prefix, [array_row_index], [array_column_index],
+    LET(
+        _rows, ROWS(array),
+        _columns, COLUMNS(array),
+        _array_row_index, IF(ISOMITTED(array_row_index), {1}, array_row_index),
+        _array_column_index, IF(ISOMITTED(array_column_index), {1}, array_column_index),
+        _prefix_array, MAKEARRAY(
+            _rows,
+            _columns,
+            LAMBDA(R, C,
+                IF(
+                    AND(
+                        ISNUMBER(XMATCH(R, _array_row_index)),
+                        ISNUMBER(XMATCH(C, _array_column_index))
+                    ),
+                    append_prefix,
+                    ""
+                )
+            )
+        ),
+        MAP(_prefix_array, array, LAMBDA(AR_1, AR_2, IF(LEN(AR_1) > 0, AR_1 & AR_2, AR_2)))
+    )
+);
+
+/**
+ * @module fnPath
+ * @function SearchArray
+ * @brief Searches for a given value in an array and returns TRUE if a match is found at the end of any element.
+ *
+ * This lambda function takes a value and an array of suffix strings, returning TRUE if the value ends
+ * with any of the suffixes in the array. It's useful for matching file extensions or similar patterns.
+ *
+ * @param value The value to be searched.
+ * @param suffix_array An array of strings to be searched for at the end of the value.
+ *
+ * @return TRUE if the value ends with any of the suffixes, otherwise FALSE.
+ *
+ * @note This function uses the MAP and REDUCE functions to search for suffix matches.
+ *
+ * @example
+ * // Checks if the value "filename.txt" ends with any of the provided suffixes:
+ * =fnPath.SearchArray("filename.txt", {".txt", ".doc"})
+ * // Output: TRUE
+ */
+SearchArray = LAMBDA(value, suffix_array,
+    MAP(
+        value,
+        LAMBDA(_value,
+            REDUCE(
+                FALSE,
+                suffix_array,
+                LAMBDA(a, b, OR(a, ISNUMBER(XMATCH(b, RIGHT(_value, LEN(b))))))
+            )
+        )
+    )
+);
+
+/**
+ * @module fnPath
+ * @function SplitPath
+ * @brief Splits a file path into its constituent directories and optionally prepends a backslash for UNC paths.
+ *
+ * This lambda function splits a given file path into an array of its directories. If the path is a UNC path
+ * (starting with "\\"), it maintains the leading backslashes in the split result.
+ *
+ * @param path The file path to be split.
+ *
+ * @return An array with each element representing a section of the split file path.
+ *
+ * @note The function uses TEXTSPLIT and a conditional statement to handle UNC paths differently.
+ *
+ * @example
+ * // Splits the path "C:\Folder\SubFolder\File.txt" into its parts:
+ * =fnPath.SplitPath("C:\\Folder\\SubFolder\\File.txt")
+ * // Output: {"C:","Folder","SubFolder","File.txt"}
+ */
+SplitPath = LAMBDA(path,
+    LET(
+        _isUNC, LEFT(path, 2) = "\\",
+        _splitPath, IF(_isUNC, TEXTSPLIT(MID(path, 3, LEN(path)), "\"), TEXTSPLIT(path, "\")),
+        IF(_isUNC, AppendArray(_splitPath, "\\"), _splitPath)
+    )
+);
+
+/**
+ * @module fnPath
+ * @function ReverseFind
+ * @brief Finds the last occurrence of a substring within a text string and returns the remainder of the text.
+ *
+ * This lambda function searches for the last occurrence of a given substring in a text string and returns
+ * everything after it. If the substring is not found, it can return a specified value or #N/A by default.
+ *
+ * @param text The text string to be searched.
+ * @param substring The substring to search for within the text string.
+ * @param [not_found] (Optional) The value to return if the substring is not found. Defaults to #N/A.
+ *
+ * @return The text after the last occurrence of the substring, or the specified not_found value.
+ *
+ * @note The function uses SUBSTITUTE and FIND functions to locate the last occurrence of the substring.
+ *
+ * @example
+ * // Finds the last occurrence of "." in "filename.txt" and returns the extension:
+ * =fnPath.ReverseFind("filename.txt", ".")
+ * // Output: ".txt"
+ */
+ReverseFind = LAMBDA(text, substring, [not_found],
+    LET(
+        _not_found, IF(ISOMITTED(not_found), NA(), not_found),
+        _result, MAP(
+            text,
+            LAMBDA(_text,
+                RIGHT(
+                    _text,
+                    LEN(_text) -
+                        FIND(
+                            "¤",
+                            SUBSTITUTE(
+                                _text,
+                                substring,
+                                "¤",
+                                LEN(_text) - LEN(SUBSTITUTE(_text, substring, ""))
+                            )
+                        )
+                )
+            )
+        ),
+        IFERROR(_result, _not_found)
+    )
+);
+
+/**
+ * @module fnPath
+ * @function IsFile
+ * @brief Determines if the given path corresponds to a file, considering optional constraints on file extensions.
+ *
+ * This lambda function evaluates whether a given path corresponds to a file by checking if the last element
+ * of the path contains a period followed by a file extension. It can consider constraints such as maximum length
+ * for the file extension and can optionally exclude or include certain extensions in the evaluation.
+ *
+ * @param path The full file path to be evaluated.
+ * @param [max_extension_length] (Optional) The maximum number of characters that a file extension can have. Defaults to 5.
+ * @param [exclude_extension_array] (Optional) An array of file extensions to be excluded from being recognized as files.
+ * @param [include_extension_array] (Optional) An array of file extensions to be included, even if they exceed the maximum length.
+ *
+ * @return TRUE if the path is determined to represent a file based on the criteria, otherwise FALSE.
+ *
+ * @note The function utilizes other lambda functions such as `SplitPath` and `ReverseFind` to dissect the path and analyze the file extension.
+ *
+ * @example
+ * // Evaluates if the path is a file and does not have an excluded extension:
+ * =fnPath.IsFile("C:\\Folder\\file.txt", 5, {".exe"}, {".txt"})
+ * // Output: TRUE
+ *
+ * // Evaluates if the path is a file with an extension longer than the default max length:
+ * =fnPath.IsFile("C:\\Folder\\archive.tar.gz", 3)
+ * // Output: FALSE
+ */
+IsFile = LAMBDA(
+    path,
+    [max_extension_length],
+    [exclude_extension_array],
+    [include_extension_array],
+    LET(
+        _max_extension_length, IF(
+            OR(LEN(max_extension_length) = 0, ISOMITTED(max_extension_length)),
+            5,
+            max_extension_length
+        ),
+        _exclude_extension_array, IF(
+            ISOMITTED(exclude_extension_array),
+            {""},
+            exclude_extension_array
+        ),
+        _include_extension_array, IF(
+            ISOMITTED(include_extension_array),
+            {""},
+            include_extension_array
+        ),
+        _splitPath, SplitPath(path),
+        _pathCount, COLUMNS(_splitPath),
+        _last, INDEX(_splitPath, 1, _pathCount),
+        _extension, ReverseFind(_last, ".", ""),
+        _lastSpace, LEN(ReverseFind(_last, " ", "")),
+        AND(
+            // Has a period char in last element of path
+            LEN(_extension) > 0,
+            OR(
+                AND(
+                    // No spaces in everything after last period
+                    OR(_lastSpace = 0, _lastSpace > LEN(_extension)),
+                    // Extension is less than specified max length
+                    LEN(_extension) <= _max_extension_length,
+                    // Extension NOT in exclude list
+                    NOT(ISNUMBER(XMATCH(_extension, _exclude_extension_array)))
+                ),
+                // Extension IS in include list
+                ISNUMBER(XMATCH(_extension, _include_extension_array))
+            )
+        )
+    )
+);
+
+/**
+ * @module fnPath
+ * @function GetFileName
+ * @brief Retrieves the file name from a given path, considering optional constraints on file extensions.
+ *
+ * This lambda function extracts the file name from a given path by splitting the path into its components
+ * and then determining if the last component is a file, based on the presence of an extension and optional
+ * inclusion or exclusion lists for extensions.
+ *
+ * @param path The full file path from which to extract the file name.
+ * @param [max_extension_length] (Optional) The maximum length of the file extension, used in determining if the last component is a file.
+ * @param [exclude_extension_array] (Optional) An array of file extensions that should be excluded when determining the file name.
+ * @param [include_extension_array] (Optional) An array of file extensions that should be included, overriding the max_extension_length constraint.
+ *
+ * @return The file name if the path is determined to be a file, otherwise an empty string.
+ *
+ * @note The function uses the `SplitPath` and `IsFile` lambda functions to split the path and determine if the last component is a file.
+ *
+ * @example
+ * // Retrieves the file name from the given path:
+ * =fnPath.GetFileName("C:\\Folder\\SubFolder\\File.txt")
+ * // Output: "File.txt"
+ *
+ * // Retrieves the file name considering a list of excluded extensions:
+ * =fnPath.GetFileName("C:\\Folder\\SubFolder\\Script.sh", 3, {".sh"})
+ * // Output: ""
+ */
+GetFileName = LAMBDA(
+    path,
+    [max_extension_length],
+    [exclude_extension_array],
+    [include_extension_array],
+    LET(
+        _splitPath, SplitPath(path),
+        _pathCount, COLUMNS(_splitPath),
+        _isFile, IsFile(
+            path,
+            max_extension_length,
+            exclude_extension_array,
+            include_extension_array
+        ),
+        IF(_isFile, INDEX(_splitPath, _pathCount), "")
+    )
+);
+
+/**
+ * @module fnPath
+ * @function GetDirectoryName
+ * @brief Retrieves the directory name at a specified level from a given path, considering optional constraints on file extensions.
+ *
+ * This lambda function extracts the directory name from a given path at a specified hierarchical level.
+ * It considers whether the path points to a file or a directory and adjusts the extraction accordingly.
+ *
+ * @param path The full file path from which to extract the directory name.
+ * @param [level] (Optional) The hierarchical level of the directory to extract. Defaults to the last directory.
+ * @param [max_extension_length] (Optional) The maximum length of the file extension, used in conjunction with file determination.
+ * @param [exclude_extension_array] (Optional) An array of file extensions to exclude in file determination.
+ * @param [include_extension_array] (Optional) An array of file extensions to include, overriding the max_extension_length constraint.
+ *
+ * @return The directory name at the specified level or an empty string if the level is not found.
+ *
+ * @note The function uses the `SplitPath`, `IsFile`, and `DROP` lambda functions to analyze the path and determine the appropriate directory segment.
+ *
+ * @example
+ * // Retrieves the directory name from the given path at the specified level:
+ * =fnPath.GetDirectoryName("C:\\Folder\\SubFolder\\File.txt", 2)
+ * // Output: "SubFolder"
+ *
+ * // Retrieves the directory name from a path that points to a directory, not a file:
+ * =fnPath.GetDirectoryName("C:\\Folder\\SubFolder\\", -1)
+ * // Output: "SubFolder"
+ */
+GetDirectoryName = LAMBDA(
+    path,
+    [level],
+    [max_extension_length],
+    [exclude_extension_array],
+    [include_extension_array],
+    LET(
+        _splitPath, SplitPath(path),
+        _isFile, IsFile(
+            path,
+            max_extension_length,
+            exclude_extension_array,
+            include_extension_array
+        ),
+        _fixedSplitPath, IF(_isFile, DROP(_splitPath, 0, -1), _splitPath),
+        _new_pathCount, COLUMNS(_fixedSplitPath),
+        _level, IF(
+            OR(LEN(level) = 0, ISOMITTED(level)),
+            _new_pathCount,
+            IF(level < 0, _new_pathCount + level + 1, level)
+        ),
+        IFERROR(INDEX(_fixedSplitPath, 1, _level), "")
+    )
+);

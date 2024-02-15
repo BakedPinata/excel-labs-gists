@@ -1,0 +1,192 @@
+/*
+fnSQL v0.2.0 - SQL GENERATION FUNCTIONS
+GIST: https://gist.github.com/BakedPinata/b1774ce231f022e4c6f335547e1d6ae3
+REPOSITORY: https://github.com/BakedPinata/excel-labs-gists
+AUTHOR: @BakedPinata
+TESTED: Microsoft Excel v2308
+*/
+
+/**
+ * @module fnSQL
+ * @function INSERT_COLUMNS
+ * @brief Generates a SQL column definition string based on the provided data 
+ *        types and headers, with optional maximum length overrides.
+ *
+ * This lambda function creates a string that defines SQL table columns,
+ * suitable for use in a CREATE TABLE statement or similar. It uses the 
+ * headers as column names and the data types to specify the type of each
+ * column. Optionally, you can override the maximum length for string-type
+ * columns.
+ *
+ * @param data_types An array of data types (e.g., NVARCHAR, VARCHAR) corresponding to each column.
+ * @param headers An array of headers that will be used as column names.
+ * @param body An array representing the data body, used to calculate maximum lengths for string-type columns.
+ * @param [max_length_override] (Optional) An array of maximum lengths to override the calculated lengths for string-type columns.
+ *
+ * @return A SQL string representing the column definitions for a CREATE TABLE statement.
+ *
+ * @note The function calculates maximum lengths for string-type columns based on the body data and applies any provided overrides.
+ *       It also handles SQL-specific formatting like collations for string types.
+ *
+ * @example
+ * // Generates column definitions for a table with NVARCHAR and INT columns:
+ * =fnSQL.INSERT_COLUMNS({"NVARCHAR", "INT"}, {"Name", "Age"}, your_data_array)
+ * // Output: "[Name] NVARCHAR(50) COLLATE Latin1_General_CI_AS, [Age] INT"
+ */
+INSERT_COLUMNS = LAMBDA(data_types, headers, body, [max_length_override],
+    LET(
+        col_count, COLUMNS(headers),
+        col_sequence, SEQUENCE(col_count),
+        header_val, INDEX(headers, 1, col_sequence),
+        dataType, INDEX(data_types, 1, col_sequence),
+        _max_len, TRANSPOSE(BYCOL(body, LAMBDA(col, MAX(LEN(col), 1)))),
+        max_len, IF(
+            ISOMITTED(max_length_override),
+            _max_len,
+            BYROW(HSTACK(TRANSPOSE(max_length_override), _max_len), LAMBDA(row, MAX(row)))
+        ),
+        fSqlParseDataType, LAMBDA(data_type, data_max_len,
+            LET(
+                _data_type, UPPER(data_type),
+                SWITCH(
+                    _data_type,
+                    "NVARCHAR", "NVARCHAR(" & data_max_len & ") COLLATE Latin1_General_CI_AS",
+                    "VARCHAR", "VARCHAR(" & data_max_len & ") COLLATE Latin1_General_CI_AS",
+                    "NCHAR", "NCHAR(" & data_max_len & ") COLLATE Latin1_General_CI_AS",
+                    "VARBINARY", "VARBINARY(" & data_max_len & ")",
+                    _data_type
+                )
+            )
+        ),
+        CONCATENATE("[" & header_val & "] " & fSqlParseDataType(dataType, max_len)) &
+            IF(col_sequence < col_count, ",", "")
+    )
+);
+
+/**
+ * @module fnSQL
+ * @function PARSE_VALUE
+ * @brief Formats a value according to its SQL data type, with an option for a default value.
+ *
+ * This lambda function formats a given value ('data_value') according to a specified SQL data type ('data_type').
+ * It handles SQL syntax for different data types, including string escaping and boolean value conversion.
+ * An optional 'default_value' parameter allows specifying a fallback value if 'data_value' is empty.
+ *
+ * @param data_type The SQL data type (e.g., NVARCHAR, VARCHAR, BIT) to format the value.
+ * @param data_value The value to be formatted according to 'data_type'.
+ * @param [default_value] (Optional) The fallback value if 'data_value' is empty. Defaults to "NULL".
+ *
+ * @return The formatted value as a string, suitable for SQL queries.
+ *
+ * @note Handles SQL-specific formatting and escaping, ensuring correct syntax for INSERT or UPDATE statements.
+ *       Uses a default value of "NULL" for empty inputs unless otherwise specified.
+ *
+ * @example
+ * // Format a string value for SQL NVARCHAR:
+ * =fnSQL.PARSE_VALUE("NVARCHAR", "John Doe")
+ * // Output: "'John Doe'"
+ *
+ * // Format an empty string with a custom default value:
+ * =fnSQL.PARSE_VALUE("NVARCHAR", "", "No Name")
+ * // Output: "'No Name'"
+ */
+PARSE_VALUE = LAMBDA(data_type, data_value, [default_value],
+    LET(
+        _data_type, UPPER(data_type),
+        _data_value, SUBSTITUTE(data_value, "'", "''"),
+        _default_value, IF(
+            ISOMITTED(default_value),
+            "NULL",
+            IF(LEN(default_value)=0, "NULL", PARSE_VALUE(data_type, default_value))
+        ),
+        _parsed, SWITCH(
+            _data_type,
+            "NVARCHAR", "'" & _data_value & "'",
+            "VARCHAR", "'" & _data_value & "'",
+            "NCHAR", "'" & _data_value & "'",
+            "VARBINARY", "'" & _data_value & "'",
+            "BIT", SWITCH(_data_value, TRUE, 1, "TRUE", 1, FALSE, 0, "FALSE", 0, _data_value),
+            _data_value
+        ),
+        IF(LEN(_data_value) = 0, _default_value, _parsed)
+    )
+);
+
+/**
+ * @module fnSQL
+ * @function INSERT_VALUE
+ * @brief Creates a SQL INSERT INTO statement for a single row of data, considering the data types and an optional table name.
+ *
+ * This lambda function generates a SQL INSERT INTO statement for a given row of data. It formats the data according to the specified
+ * data types, and optionally allows specifying a table name. If no table name is provided, it defaults to "#LoadTable".
+ *
+ * @param dataTypes An array of data types (e.g., NVARCHAR, VARCHAR, BIT) for each column in the row.
+ * @param headers An array of column names corresponding to each data point in the row.
+ * @param dataRow An array of values representing a single row of data to be inserted.
+ * @param [tableName] (Optional) The name of the SQL table into which the data should be inserted. Defaults to "#LoadTable".
+ * @param [defaultValues] (Optional) The default values to use for the row when the corresponding column is null.
+ *
+ * @return A SQL INSERT INTO statement for the provided data row.
+ *
+ * @note The function handles the SQL syntax for different data types, including escaping strings and converting boolean values for BIT columns.
+ *       It also ensures NULL is used for empty strings.
+ *
+ * @example
+ * // Creates an INSERT INTO statement for a row with a string and an integer:
+ * =fnSQL.INSERT_VALUE({"NVARCHAR", "INT"}, {"Name", "Age"}, {"John Doe", 30}, "YourTable")
+ * // Output: "INSERT INTO YourTable ([Name], [Age]) VALUES ('John Doe', 30)"
+ */
+INSERT_VALUE = LAMBDA(dataTypes, headers, dataRow, [tableName], [defaultValues],
+    LET(
+        _tableName, IF(ISOMITTED(tableName), "#LoadTable", tableName),
+        col_sequence, SEQUENCE(COLUMNS(headers)),
+        dataType, TRANSPOSE(INDEX(dataTypes, 1, col_sequence)),
+        "INSERT INTO " & _tableName & " (" & TEXTJOIN(", ", FALSE, "[" & headers & "]") & ") VALUES (" &
+            TEXTJOIN(", ", FALSE, PARSE_VALUE(dataType, dataRow, defaultValues)) & ")"
+    )
+);
+
+/**
+ * @module fnSQL
+ * @function INSERT_VALUES
+ * @brief Creates multiple SQL INSERT INTO statements for multiple rows of data, considering the data types and an optional table name.
+ *
+ * This lambda function generates SQL INSERT INTO statements for a given range of data. It formats the data according to the specified
+ * data types, and optionally allows specifying a table name. If no table name is provided, it defaults to "#LoadTable". The function will
+ * also filter the output based on a specified required column index, defaulting to 1 if not provided. 
+ *
+ * @param dataTypes An array of data types (e.g., NVARCHAR, VARCHAR, BIT) for each column in each row.
+ * @param headers An array of column names corresponding to each data point in each row.
+ * @param dataRows A 2D array of values representing multiple rows of data to be inserted.
+ * @param [tableName] (Optional) The name of the SQL table into which the data should be inserted. Defaults to "#LoadTable".
+ * @param [defaultValues] (Optional) The default values to use for each row when the corresponding column is null.
+ * @param [requiredColumnIndex] (Optional) Index of column that must be populated for the row to be included in the filtered output. Defaults
+ *        to left most column.
+ * @param [noData] (Optional) Value to return if no dataRows are in filtered output. Defaults to "-- NO DATA --"
+ *
+ * @return A collection of SQL INSERT INTO statements for the provided data rows.
+ *
+ * @note The function handles the SQL syntax for different data types, including escaping strings and converting boolean values for BIT columns.
+ *       It also ensures NULL is used for empty strings.
+ *
+ * @example
+ * // Creates an INSERT INTO statement for each row of dataRows:
+ * =fnSQL.INSERT_VALUES({"NVARCHAR", "INT"}, {"Name", "Age"}, {"John Doe", 30; "Jane Doe", 29}, "YourTable")
+ * // Output: {"INSERT INTO YourTable ([Name], [Age]) VALUES ('John Doe', 30)"; "INSERT INTO YourTable ([Name], [Age]) VALUES ('Jane Doe', 29)"}
+ */
+INSERT_VALUES = LAMBDA(dataTypes, headers, dataRows, [tableName], [defaultValues], [requiredColumnIndex], [noData],
+    LET(
+        _requiredColumnIndex, IF(ISOMITTED(requiredColumnIndex),1,requiredColumnIndex),
+        _noData, IF(ISOMITTED(noData),"-- NO DATA --",noData),
+        ARR, LET(
+            LMBD, LAMBDA(RW, fnSQL.INSERT_VALUE(dataTypes, headers, RW, tableName, defaultValues)),
+            BYROW(TRIM(dataRows), LMBD)
+        ),
+        _TAKECOLUMN, LAMBDA(array, column_to_take, TAKE(TAKE(array,,column_to_take),,-1)),
+        FILTER(
+            ARR,
+            LEN(_TAKECOLUMN(dataRows, _requiredColumnIndex)) > 0,
+            _noData
+        )
+    )
+);

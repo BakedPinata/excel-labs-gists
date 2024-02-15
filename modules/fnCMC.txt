@@ -1,0 +1,489 @@
+/*
+fnCMC v0.1.5 - CMC UTILITY FUNCTIONS
+GIST: https://gist.github.com/BakedPinata/a323e9e8b2c3e2bbdba828693b02692d
+REPOSITORY: https://github.com/BakedPinata/excel-labs-gists
+AUTHOR: @BakedPinata
+TESTED: Microsoft Excel v2308
+*/
+
+/**
+ * @module fnCMC
+ * @function PARENT
+ * @brief Navigates up the hierarchy of a given CMC (Common Management Code) by one or more levels.
+ *
+ * This lambda function takes a single CMC or an array of CMCs and navigates up the hierarchy 
+ * by a specified number of levels. If the levels parameter is omitted, it defaults to navigating 
+ * up one level. The function is wrapped in a BYROW function, allowing it to process a range or 
+ * array of CMCs. It handles special cases for "A" and "Z" (root nodes) and determines the parent code 
+ * based on the length of the CMC and the specified level.
+ * It is designed to be used recursively to navigate up multiple levels if required.
+ *
+ * @param cmc A single CMC or a range/array of CMC strings to be processed.
+ * @param [levels] (Optional) An integer indicating the number of hierarchy levels to navigate up. 
+ *                  Defaults to 1 if omitted.
+ *
+ * @return A range or array where each CMC is replaced with its code at the specified higher level 
+ *         in the hierarchy. If the CMC is "A" or "Z", or if the specified level is not compatible 
+ *         with the CMC length, it returns an empty string. If an error occurs during processing, 
+ *         it also returns an empty string.
+ *
+ * @note The function is case-insensitive as it converts all CMCs to uppercase before processing.
+ *
+ * @example
+ * // To navigate up one level in the hierarchy of a single CMC:
+ * =fnCMC.PARENT("PBA01A01")
+ * // Output: "PBA01"
+ *
+ * // To navigate up two levels in the hierarchy:
+ * =fnCMC.PARENT("PBA01A01", 2)
+ * // Output: "PB"
+ *
+ * // To apply the function to an array of CMCs and navigate each up one level:
+ * =fnCMC.PARENT({"P", "PB"})
+ * // Output: {"A", "P"}
+ */
+PARENT = LAMBDA(cmc, [levels],
+    LET(
+        RESULT, MAP(
+            cmc,
+            LAMBDA(cmc,
+                LET(
+                    _CMC, UPPER(cmc),
+                    _Levels, IF(ISOMITTED(levels), 1, levels),
+                    CMC_L, LEN(_CMC),
+                    IFERROR(
+                        IF(
+                            _Levels = 0,
+                            cmc,
+                            IF(
+                                _Levels > 1,
+                                PARENT(PARENT(_CMC), _Levels - 1),
+                                IF(
+                                    OR(_CMC = "A", _CMC = "Z"),
+                                    "",
+                                    SWITCH(
+                                        CMC_L,
+                                        1, "A",
+                                        2, LEFT(cmc, 1),
+                                        5, LEFT(cmc, 2),
+                                        8, LEFT(cmc, 5),
+                                        IF(
+                                            CMC_L < 8,
+                                            #VALUE!,
+                                            IF(MOD(CMC_L, 2) = 1, #VALUE!, LEFT(cmc, CMC_L - 2))
+                                        )
+                                    )
+                                )
+                            )
+                        ),
+                        ""
+                    )
+                )
+            )
+        ),
+        IF(COUNTA(RESULT) = 1, INDEX(RESULT, 1), RESULT)
+    )
+);
+
+/**
+ * @module fnCMC
+ * @function AT_LEVEL
+ * @brief Retrieves a CMC (Common Management Code) at a specified hierarchical level relative to a given CMC.
+ *
+ * This lambda function calculates the CMC at a specific 'target_level' relative to a provided 'cmc'. If the
+ * 'cmc' is at a lower level than 'target_level', it returns a specified fallback value or the original 'cmc'
+ * by default.
+ *
+ * @param cmc The reference CMC from which the level calculation is based.
+ * @param target_level The hierarchical level to target relative to the 'cmc'.
+ * @param [if_below_target_level] (Optional) The value to return if the 'cmc' is at a lower level than the
+ *                                'target_level'. Defaults to returning the original 'cmc'.
+ *
+ * @return The CMC at the 'target_level' if the 'cmc' is at or above the 'target_level'; otherwise, it returns
+ *         '_if_below_target_level' or the original 'cmc'.
+ *
+ * @note This function uses the `LEVEL` function to determine the hierarchical level of the input CMC and the
+ *       `PARENT` function to find the CMC at the desired level.
+ *
+ * @example
+ * // Retrieve the CMC at two levels above "PBA01A01":
+ * =fnCMC.AT_LEVEL("PBA01A01", 3)
+ * // Output: "PB"
+ *
+ * // Retrieve the CMC at a level above "PB", with a fallback value if below that level:
+ * =fnCMC.AT_LEVEL("PBA01", 6, "Fallback")
+ * // Output: "Fallback"
+ */
+AT_LEVEL = LAMBDA(cmc, target_level, [if_below_target_level],
+    LET(
+        _if_below_target_level, IF(ISOMITTED(if_below_target_level), cmc, if_below_target_level),
+        cmc_level, LEVEL(cmc),
+        return_level, cmc_level - target_level,
+        IF(
+            return_level < 0,
+            _if_below_target_level,
+            PARENT(cmc, return_level)
+        )
+    )
+);
+
+/**
+ * @module fnCMC
+ * @function LAST_CHILD
+ * @brief Retrieves the last child code of a given CMC within a specified array of CMCs.
+ *
+ * This lambda function takes a single CMC or an array of CMCs and an array of potential child CMCs.
+ * It identifies the last child CMC for each given CMC based on the provided array. The last child
+ * is determined by sorting the potential children in descending order and selecting the first one
+ * that matches the parent CMC when the parent function is applied.
+ *
+ * @param cmc A single CMC or a range/array of CMC strings whose last child is to be found.
+ * @param cmc_array An array of CMC strings representing potential children to be searched.
+ *
+ * @return A range or array where each CMC is replaced with its last child code based on the cmc_array.
+ *         If no children are found, or if the input CMC is empty, it returns an empty string.
+ *
+ * @note This function assumes that the cmc_array is a complete list of potential children for the input
+ *       CMC(s).
+ *
+ * @example
+ * // To find the last child of a single CMC within an array of CMCs:
+ * =fnCMC.LAST_CHILD("PB", {"PBA01", "PBA02", "PBB01", "PBB02"})
+ * // Output: "PBB02"
+ *
+ * // To apply the function to an array of CMCs and find the last child for each:
+ * =fnCMC.LAST_CHILD({"P", "PB"}, {"P", "PB", "PBA01", "PBA02"})
+ * // Output: {"PBB02", "PBA02"}
+ */
+LAST_CHILD = LAMBDA(cmc, cmc_array,
+    LET(
+        result, MAP(
+            cmc,
+            LAMBDA(cmc,
+                IF(
+                    LEN(cmc) = 0,
+                    "",
+                    LET(
+                        list, SORT(FILTER(cmc_array, PARENT(cmc_array) = cmc), 1, -1),
+                        IFERROR(INDEX(list, 1), "")
+                    )
+                )
+            )
+        ),
+        IF(COUNTA(result) = 1, INDEX(result, 1), result)
+    )
+);
+
+/**
+ * @module fnCMC
+ * @function LEVEL
+ * @brief Determines the hierarchical level of a given CMC (Common Management Code).
+ *
+ * This lambda function takes a single CMC or an array of CMCs and calculates the hierarchical level
+ * for each. The level is determined based on the length and structure of the CMC. Special cases for
+ * root nodes "A" and "Z", where the level is equal to 1.
+ *
+ * @param cmc A single CMC or a range/array of CMC strings to be processed for level determination.
+ *
+ * @return A range or array of integers representing the hierarchical level of each CMC.
+ *         If the CMC length is not compatible with the expected structure, it returns a #VALUE!
+ *         error.
+ *
+ * @note The function is case-insensitive as it converts all CMCs to uppercase before processing.
+ *
+ * @example
+ * // To determine the level of a single CMC:
+ * =fnCMC.LEVEL("PBA01A01")
+ * // Output: 4
+ *
+ * // To apply the function to an array of CMCs and determine the level for each:
+ * =fnCMC.LEVEL({"P", "PB", "PBA01", "PBA01A01"})
+ * // Output: {1, 2, 3, 4}
+ */
+LEVEL = LAMBDA(cmc,
+    LET(
+        result, MAP(
+            cmc,
+            LAMBDA(cmc,
+                LET(
+                    _cmc, UPPER(cmc),
+                    cmc_length, LEN(_cmc),
+                    IF(
+                        OR(_cmc = "A", _cmc = "Z"),
+                        1,
+                        IF(LEFT(_cmc, 1) = "Z", 0, 1) +
+                            SWITCH(
+                                cmc_length,
+                                1, 1,
+                                2, 2,
+                                5, 3,
+                                8, 4,
+                                IF(
+                                    cmc_length < 8,
+                                    #VALUE!,
+                                    IF(MOD(cmc_length, 2) = 1, #VALUE!, ((cmc_length - 8) / 2) + 4)
+                                )
+                            )
+                    )
+                )
+            )
+        ),
+        IF(COUNTA(result) = 1, INDEX(result, 1), result)
+    )
+);
+
+/**
+ * @module fnCMC
+ * @function CHILDREN
+ * @brief Retrieves a list of child CMCs (Common Management Codes) from a given list, based on a specified
+ *        parent CMC.
+ *
+ * This lambda function provides a list of children for a given CMC within a provided list of CMCs. It can
+ * optionally return only direct children (next level in the hierarchy) or all descendants. Special handling
+ * is included for root nodes "A" and "Z". An optional parameter allows specifying a return value in case the
+ * result is empty.
+ *
+ * @param cmc The parent CMC for which child CMCs are to be retrieved.
+ * @param cmc_list An array of CMC strings representing the entire set of potential children.
+ * @param [direct_children] (Optional) A boolean flag indicating whether to return only direct children (TRUE)
+ *                          or all descendants (FALSE). Defaults to TRUE.
+ * @param [if_empty] (Optional) The value to return if the resulting list of children is empty.
+ *
+ * @return An array of child CMCs. If the result is empty, it returns the value specified by 'if_empty'.
+ *
+ * @note This function uses the `LEVEL` function to determine the hierarchical level of CMCs and applies
+ *       filters based on the parent CMC and the desired child level.
+ *
+ * @example
+ * // To retrieve the direct children of a given CMC in a list:
+ * =fnCMC.CHILDREN("PB", {"PB", "PBA01", "PBB02", "PBA01A01", "PBB02C0101"})
+ * // Output: {"PBA01", "PBB02"}
+ *
+ * // To retrieve all descendants of a given CMC in a list:
+ * =fnCMC.CHILDREN("PB", {"PB", "PBA01", "PBB02", "PBA01A01", "PBB02C0101"}, FALSE)
+ * // Output: {"PBA01", "PBB02", "PBA01A01", "PBB02C0101"}
+ */
+CHILDREN = LAMBDA(cmc, cmc_list, [direct_children], [if_empty],
+    LET(
+        _direct_children, IF(ISOMITTED(direct_children), TRUE, direct_children),
+        cmc_level, LEVEL(cmc),
+        cmc_list_level, LEVEL(cmc_list),
+        level_filter, IF(_direct_children, cmc_list_level = (cmc_level + 1), cmc_list_level > cmc_level),
+        IFS(
+            cmc = "A",
+            FILTER(cmc_list, (LEFT(cmc_list, 1) <> "Z") * (level_filter), if_empty),
+            cmc = "Z",
+            FILTER(cmc_list, (LEFT(cmc_list, 1) = "Z") * (level_filter), if_empty),
+            TRUE,
+            FILTER(cmc_list, (LEFT(cmc_list, LEN(cmc)) = cmc) * (level_filter), if_empty)
+        )
+    )
+);
+
+/**
+ * @module fnCMC
+ * @function CHILDREN_COUNT
+ * @brief Retrieves the count of child CMCs (Common Management Codes) from a given list, based on a specified
+ *        parent CMC.
+ *
+ * This lambda function calculates the number of children for a given CMC within a provided list of CMCs. It
+ * can optionally return only direct children (i.e., the next level in the hierarchy) or all descendants.
+ * Special handling is included for root * nodes "A" and "Z".
+ *
+ * @param cmc The parent CMC for which children are to be counted.
+ * @param cmc_list An array of CMC strings representing the entire set of potential children.
+ * @param [direct_children] (Optional) A boolean flag to indicate whether to count only direct children (TRUE)
+ *                          or all descendants (FALSE). Defaults to TRUE.
+ *
+ * @return An integer representing the count of child CMCs. Returns 0 if no children are found and #N/A if an
+ *         error occurs.
+ *
+ * @note This function uses the `LEVEL` function to determine the hierarchical level of CMCs and applies 
+ *       filters based on the parent CMC and the desired child level. It handles special cases for "A"
+ *       and "Z" root nodes differently.
+ *
+ * @example
+ * // To count the direct children of a given CMC in a list:
+ * =fnCMC.CHILDREN_COUNT("PB", {"PBA01", "PBA01A01", "PBB01", "PBB01A01"})
+ * // Output: 2
+ *
+ * // To count all descendants of a given CMC in a list:
+ * =fnCMC.CHILDREN_COUNT("PB", {"PBA01", "PBA01A01", "PBB01", "PBB01A01"}, FALSE)
+ * // Output: 4
+ */
+CHILDREN_COUNT = LAMBDA(cmc, cmc_list, [direct_children],
+    LET(
+        result_array, CHILDREN(cmc, cmc_list, direct_children),
+        IF(ISERROR(INDEX(result_array, 1)), 0, COUNTA(result_array))
+    )
+);
+
+/**
+ * @module fnCMC
+ * @function ARRAY_FIND
+ * @brief Determines if all values in a find array exist within a search array.
+ *
+ * This lambda function checks if each value in a given 'find_values' array exists in a 'search_array'.
+ * It returns TRUE if all values are found, otherwise FALSE. An optional 'if_error' value can be returned in
+ * case of an error.
+ *
+ * @param find_values An array of values to be searched for in the 'search_array'.
+ * @param search_array An array in which the values are to be searched.
+ * @param [if_error] (Optional) A value to return in case of an error during the search process.
+ *
+ * @return TRUE if all 'find_values' exist in 'search_array', FALSE if not, or 'if_error' value in case of an
+ *         error.
+ *
+ * @note This function uses the XMATCH function to check for the existence of each value in the search array.
+ *
+ * @example
+ * // Check if values {"A", "B"} are in the array {"A", "B", "C"}:
+ * =fnCMC.ARRAY_FIND({"A", "B"}, {"A", "B", "C"})
+ * // Output: TRUE
+ *
+ * // Check if values {"A", "123"} are in the array {"A", "B", "C"}:
+ * =fnCMC.ARRAY_FIND({"A", "123"}, {"A", "B", "C"})
+ * // Output: FALSE
+ */
+ARRAY_FIND = LAMBDA(find_values, search_array, [if_error],
+    IF(
+        ISERROR(INDEX(find_values, 1)),
+        if_error,
+        REDUCE(TRUE, find_values, LAMBDA(a, b, AND(a, ISNUMBER(XMATCH(b, search_array)))))
+    )
+);
+
+/**
+ * @module fnCMC
+ * @function DELETE_ROUND
+ * @brief Determines the order in which CMCs need to be deleted from a list of CMCs, based on a complete list
+ *        of existing CMCs.
+ *
+ * This function calculates the deletion order for CMCs (Common Management Codes) in a given 'delete_list',
+ * considering the hierarchical structure defined by a 'complete_list'. It uses the concept of 'rounds',
+ * where each round represents a level in the hierarchy from which CMCs can be deleted.
+ *
+ * @param cmc The CMC for which the deletion round is to be calculated.
+ * @param delete_list An array of CMCs scheduled for deletion.
+ * @param complete_list An array representing the complete list of existing CMCs.
+ * @param [force_load] (Optional) A flag to control the return value in special cases.
+ *
+ * @return The deletion round number for the given CMC, or special values like "NOT FOUND" or
+ *         "CHILDREN NOT IN LOAD" based on 'force_load' parameter.
+ *
+ * @note The function relies on other functions like 'CHILDREN', 'CHILDREN_COUNT', and 'ARRAY_FIND' to
+ *       determine the hierarchical position and dependencies.
+ *
+ * @example
+ * // Determine the deletion round for "PBA01A01" in a given delete list:
+ * =fnCMC.DELETE_ROUND("PBA01A01", {"PBA01A01", "PBA01A0101"}, {"PB","PBA01","PBA01A01","PBA01B01","PBA01A0101"})
+ * // Output: 2
+ *
+ * // Determine the deletion round for "PBA01" in a given delete list:
+ * =fnCMC.DELETE_ROUND("PBA01", {"PBA01A01", "PBA01A0101"}, {"PB","PBA01","PBA01A01","PBA01B01","PBA01A0101"})
+ * // Output: "CHILDREN NOT IN LOAD"
+ */
+DELETE_ROUND = LAMBDA(cmc, delete_list, complete_list, [force_load],
+    IF(
+        LEN(cmc) = 0,
+        "",
+        LET(
+            _force_load, IF(ISOMITTED(force_load), FALSE, force_load),
+            not_found, IF(_force_load, 0, "NOT FOUND"),
+            missing_children, IF(_force_load, 0, "CHILDREN NOT IN LOAD"),
+            exists_in_complete, ISNUMBER(XMATCH(cmc, complete_list)),
+            IF(
+                NOT(exists_in_complete),
+                not_found,
+                LET(
+                    children, CHILDREN(cmc, complete_list, FALSE),
+                    children_count, CHILDREN_COUNT(cmc, complete_list, FALSE),
+                    IF(
+                        children_count = 0,
+                        1,
+                        LET(
+                            children_in_delete_list, ARRAY_FIND(children, delete_list, TRUE),
+                            IF(
+                                NOT(children_in_delete_list),
+                                missing_children,
+                                LET(
+                                    children_levels, LEVEL(children),
+                                    max_level, MAX(children_levels),
+                                    delete_pass, max_level - LEVEL(cmc) + 1,
+                                    delete_pass
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+);
+
+/**
+ * @module fnCMC
+ * @function CREATE_ROUND
+ * @brief Determines the order in which new CMCs should be created, based on a list of CMCs to be created
+ *        and a complete list of existing CMCs.
+ *
+ * This function calculates the creation order for new CMCs (Common Management Codes) in a 'create_list',
+ * considering the existing hierarchy in 'complete_list'. It determines which CMCs need to be created first
+ * to maintain hierarchical integrity, assigning 'rounds' to each CMC, where lower rounds are created first.
+ *
+ * @param cmc The CMC for which the creation round is to be calculated.
+ * @param create_list An array of new CMCs to be created.
+ * @param complete_list An array representing the complete list of existing CMCs.
+ * @param [force_load] (Optional) A flag to control the behavior in special cases.
+ * @param [ancestor_missing_flag] (Optional) A flag to track if an ancestor is missing in the creation process.
+ * @param [load_round] (Optional) The current load round number.
+ * @param [root_cmc] (Optional) The current root CMC. Root will never have parent so return _load_round instead
+ *                   of just returning missing_parent. Default value is "A".
+ *
+ * @return The creation round number for the given CMC, or special values like "EXCLUDE" or "MISSING PARENT"
+ *         based on parameters.
+ *
+ * @note This function recursively calls itself and utilises 'PARENT' and 'XMATCH' functions to determine
+ *       the hierarchical dependencies.
+ *
+ * @example
+ * // Determine the creation round for "PBA01A0101" in a given create list:
+ * =fnCMC.CREATE_ROUND("PBA01A0101", {"PBA01A01","PBA01B01","PBA01A0101"}, {"PB","PBA01"})
+ * // Output: 2
+ *
+ * // Determine the creation round for "PBA01" in a given create list:
+ * =fnCMC.CREATE_ROUND("PBA01A0101", {"PBA01A01","PBA01B01","PBA01A0101"}, {"PB","PBA01"})
+ * // Output: 2
+ */
+CREATE_ROUND = LAMBDA(cmc, create_list, complete_list, [force_load], [ancestor_missing_flag], [load_round], [root_cmc],
+    IF(
+        LEN(cmc) = 0,
+        "",
+        LET(
+            _load_round, IF(ISOMITTED(load_round), 0, load_round),
+            _force_load, IF(ISOMITTED(force_load), FALSE, force_load),
+            _root_cmc, IF(ISOMITTED(root_cmc),"A",root_cmc),
+            exclude, IF(_force_load, 0, "EXCLUDE"),
+            missing_parent, IF(_force_load, 0, "MISSING PARENT"),
+            parent_not_found, NOT(ISNUMBER(XMATCH(PARENT(cmc), VSTACK(create_list, complete_list)))),
+            cumulative_ancestor_missing_flag, IF(
+                ISOMITTED(ancestor_missing_flag),
+                parent_not_found,
+                OR(parent_not_found, ancestor_missing_flag)
+            ),
+            IF(
+                ISNUMBER(XMATCH(cmc, complete_list)),
+                IF(_load_round = 0, exclude, IF(AND(cumulative_ancestor_missing_flag, cmc <> _root_cmc), missing_parent, _load_round)),
+                CREATE_ROUND(
+                    PARENT(cmc),
+                    create_list,
+                    complete_list,
+                    force_load,
+                    cumulative_ancestor_missing_flag,
+                    _load_round + 1,
+                    _root_cmc
+                )
+            )
+        )
+    )
+);

@@ -1,0 +1,40 @@
+name: Deploy Gist Files Dynamically
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'modules/*.txt'
+  workflow_dispatch:
+
+jobs:
+  prepare_deployments:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      - id: set-matrix
+        run: |
+          chmod +x ./prepare_deployments.sh
+          ./prepare_deployments.sh ${{ github.event_name }}
+        shell: bash
+      - run: echo "${{ steps.set-matrix.outputs.matrix }}"
+
+  deploy:
+    needs: prepare_deployments
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.prepare_deployments.outputs.matrix)}}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Deploy
+        uses: exuanbo/actions-deploy-gist@v1
+        with:
+          token: ${{ secrets.TOKEN }}
+          gist_id: ${{ matrix.gist_id }}
+          file_path: ${{ matrix.file_path }}
+          file_type: text
