@@ -1,6 +1,6 @@
 /*
 fnCMC v0.1.0 - FILE & FOLDER PATH UTILITY FUNCTIONS
-GIST: https://gist.github.com/BakedPinata/50da565e21e6070802860bde266615c2s
+GIST: https://gist.github.com/BakedPinata/50da565e21e6070802860bde266615c2
 REPOSITORY: https://github.com/BakedPinata/excel-labs-gists
 AUTHOR: @BakedPinata
 TESTED: Microsoft Excel v2308
