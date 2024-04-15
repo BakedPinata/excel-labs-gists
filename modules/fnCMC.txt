@@ -266,16 +266,19 @@ LEVEL = LAMBDA(cmc,
 CHILDREN = LAMBDA(cmc, cmc_list, [direct_children], [if_empty],
     LET(
         _direct_children, IF(ISOMITTED(direct_children), TRUE, direct_children),
+        _cmc_list, FILTER(cmc_list, LEN(cmc_list) > 0),
         cmc_level, LEVEL(cmc),
-        cmc_list_level, LEVEL(cmc_list),
+        cmc_list_level, LEVEL(_cmc_list),
         level_filter, IF(_direct_children, cmc_list_level = (cmc_level + 1), cmc_list_level > cmc_level),
         IFS(
             cmc = "A",
-            FILTER(cmc_list, (LEFT(cmc_list, 1) <> "Z") * (level_filter), if_empty),
+            FILTER(_cmc_list, (LEFT(_cmc_list, 1) <> "Z") * (level_filter), if_empty),
             cmc = "Z",
-            FILTER(cmc_list, (LEFT(cmc_list, 1) = "Z") * (level_filter), if_empty),
+            FILTER(_cmc_list, (LEFT(_cmc_list, 1) = "Z") * (level_filter), if_empty),
+            LEN(cmc) = 0,
+            if_empty,
             TRUE,
-            FILTER(cmc_list, (LEFT(cmc_list, LEN(cmc)) = cmc) * (level_filter), if_empty)
+            FILTER(_cmc_list, (LEFT(_cmc_list, LEN(cmc)) = cmc) * (level_filter), if_empty)
         )
     )
 );
