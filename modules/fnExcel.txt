@@ -1,0 +1,14 @@
+/*
+fnExcel v0.0.1 - STANDARD EXCEL FUNCTION WRAPPERS
+GIST: https://gist.github.com/BakedPinata/13db435c0a4e2b461ea01ac648e517b4
+REPOSITORY: https://github.com/BakedPinata/excel-labs-gists
+AUTHOR: @BakedPinata
+TESTED: Microsoft Excel v2308
+*/
+
+XLOOKUP = LAMBDA(lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode],
+    LET(
+        X, XLOOKUP(lookup_value, lookup_array, return_array, if_not_found, match_mode, search_mode),
+        IF(LEN(X)=0,"",X)
+    )
+);
