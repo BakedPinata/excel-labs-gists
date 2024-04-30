@@ -1,5 +1,5 @@
 /*
-fnExcel v0.0.1 - STANDARD EXCEL FUNCTION WRAPPERS
+fnExcel v0.0.2 - STANDARD EXCEL FUNCTION WRAPPERS
 GIST: https://gist.github.com/BakedPinata/13db435c0a4e2b461ea01ac648e517b4
 REPOSITORY: https://github.com/BakedPinata/excel-labs-gists
 AUTHOR: @BakedPinata
@@ -9,6 +9,36 @@ TESTED: Microsoft Excel v2308
 XLOOKUP = LAMBDA(lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode],
     LET(
         X, XLOOKUP(lookup_value, lookup_array, return_array, if_not_found, match_mode, search_mode),
-        IF(LEN(X)=0,"",X)
+        IF(LEN(X) = 0, "", X)
+    )
+);
+
+ISNULL = LAMBDA(value_to_check, value_if_null, IF(LEN(value_to_check) > 0, value_to_check, value_if_null));
+
+// Source: https://www.reddit.com/r/excel/comments/17ovi3x/comment/k85dtks/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
+CALENDAR = LAMBDA(Year, Month, Day,
+    LET(
+        INPUT, DATE(Year, Month, Day),
+        A, EXPAND(TEXT(SEQUENCE(7), "ddd"), 6 + WEEKDAY(INPUT, 1), , ""),
+        B, DAY(SEQUENCE(EOMONTH(INPUT, 0) - INPUT + 1, , INPUT)),
+        C, EXPAND(UPPER(TEXT(INPUT, "MMM")), 7, , ""),
+        D, WRAPROWS(VSTACK(C, A, B), 7, ""),
+        D
+    )
+);
+
+// Source: https://www.reddit.com/r/excel/comments/17ovi3x/comment/k85c1s9/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
+SUBTITUTEALL = LAMBDA(Text_to_Change, Substitution_Table,
+    LET(
+        A, " " & Text_to_Change & " ",
+        B, TRIM(Substitution_Table),
+        Prefix, {"-", """", "'", " "},
+        Suffix, {"-", """", "'", " ", ".", ",", ":", ";", "=", "?", "!"},
+        Frm_1, TOCOL(Prefix & TOCOL(CHOOSECOLS(B, 1) & Suffix)),
+        Frm_2, VSTACK(UPPER(Frm_1), LOWER(Frm_1), PROPER(Frm_1)),
+        To_1, TOCOL(Prefix & TOCOL(CHOOSECOLS(B, 2) & Suffix)),
+        To_2, VSTACK(UPPER(To_1), LOWER(To_1), PROPER(To_1)),
+        Output, REDUCE(A, SEQUENCE(ROWS(To_2)), LAMBDA(X, Y, SUBSTITUTE(X, INDEX(Frm_2, Y), INDEX(To_2, Y)))),
+        TRIM(Output)
     )
 );
