@@ -1,5 +1,5 @@
 /*
-fnExcel v0.0.2 - STANDARD EXCEL FUNCTION WRAPPERS
+fnExcel v0.1.0 - STANDARD EXCEL FUNCTION WRAPPERS
 GIST: https://gist.github.com/BakedPinata/13db435c0a4e2b461ea01ac648e517b4
 REPOSITORY: https://github.com/BakedPinata/excel-labs-gists
 AUTHOR: @BakedPinata
@@ -40,5 +40,26 @@ SUBTITUTEALL = LAMBDA(Text_to_Change, Substitution_Table,
         To_2, VSTACK(UPPER(To_1), LOWER(To_1), PROPER(To_1)),
         Output, REDUCE(A, SEQUENCE(ROWS(To_2)), LAMBDA(X, Y, SUBSTITUTE(X, INDEX(Frm_2, Y), INDEX(To_2, Y)))),
         TRIM(Output)
+    )
+);
+
+// Truncate text at the last specified delimiter before a specified max length
+TRUNCATEATDELIMITER = LAMBDA(text, maxLength, delimiter,
+    IF(
+        LEN(text) <= maxLength,
+        text,
+        LET(
+            trimmedText, LEFT(text, maxLength + 1),
+            lastDelimiterPosition, FIND(
+                "@||@",
+                SUBSTITUTE(
+                    trimmedText,
+                    delimiter,
+                    "@||@",
+                    LEN(trimmedText) - LEN(SUBSTITUTE(trimmedText, delimiter, ""))
+                )
+            ),
+            IF(ISERROR(lastDelimiterPosition), LEFT(trimmedText, maxLength), LEFT(trimmedText, lastDelimiterPosition - 1))
+        )
     )
 );
