@@ -32,7 +32,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Deploy
-        uses: exuanbo/actions-deploy-gist@v1
+        uses: BakedPinata/actions-deploy-gist@v1
         with:
           token: ${{ secrets.TOKEN }}
           gist_id: ${{ matrix.gist_id }}
