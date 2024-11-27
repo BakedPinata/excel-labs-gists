@@ -65,3 +65,9 @@ TRUNCATEATDELIMITER = LAMBDA(text, maxLength, delimiter,
         )
     )
 );
+
+// Generate a string property name for use in C#
+GENERATEPROPERTYNAME = LAMBDA(Name,
+    LET(CleanName, REDUCE(PROPER(Name),{",","*"," ",".","'","(",")"},LAMBDA(acc,char,SUBSTITUTE(acc,char,""))),
+    "[ExcelColumn(" & CHAR(34) & Name & CHAR(34) & ")] public string? " & CleanName & " { get; set; }")
+)
