@@ -18,14 +18,16 @@ ISNULL = LAMBDA(value_to_check,LEN(value_to_check) = 0);
 IFNULL = LAMBDA(value_to_check, value_if_null, IF(LEN(value_to_check) > 0, value_to_check, value_if_null));
 
 // Source: https://www.reddit.com/r/excel/comments/17ovi3x/comment/k85dtks/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
-CALENDAR = LAMBDA(Year, Month, Day,
+CALENDAR = LAMBDA(Year, Month, Day, [StartDay],
     LET(
+        SD, IF(ISOMITTED(StartDay), 2, StartDay),
         INPUT, DATE(Year, Month, Day),
-        A, EXPAND(TEXT(SEQUENCE(7), "ddd"), 6 + WEEKDAY(INPUT, 1), , ""),
-        B, DAY(SEQUENCE(EOMONTH(INPUT, 0) - INPUT + 1, , INPUT)),
-        C, EXPAND(UPPER(TEXT(INPUT, "MMM")), 7, , ""),
-        D, WRAPROWS(VSTACK(C, A, B), 7, ""),
-        D
+        WEEKDAY_OFFSET, WEEKDAY(INPUT, SD),
+        DAY_NAMES, EXPAND(TEXT(SEQUENCE(7,,SD,1), "dddd"), 6 + WEEKDAY_OFFSET, , ""),
+        DAY_NUMBERS, DAY(SEQUENCE(EOMONTH(INPUT, 0) - INPUT + 1, , INPUT)),
+        MONTH_NAME, EXPAND(UPPER(TEXT(INPUT, "MMMM")), 7, , ""),
+        OUTPUT, WRAPROWS(VSTACK(MONTH_NAME, DAY_NAMES, DAY_NUMBERS), 7, ""),
+        OUTPUT
     )
 );
 
