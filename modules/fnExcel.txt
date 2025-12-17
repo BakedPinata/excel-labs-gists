@@ -15,7 +15,7 @@ XLOOKUP = LAMBDA(lookup_value, lookup_array, return_array, [if_not_found], [matc
 
 ISNULL = LAMBDA(value_to_check,LEN(value_to_check) = 0);
 
-IFNULL = LAMBDA(value_to_check, value_if_null, IF(LEN(value_to_check) > 0, value_to_check, value_if_null));
+IFNULL = LAMBDA(value_to_check,[value_if_null], IF(LEN(value_to_check) > 0, value_to_check, IF(ISOMITTED(value_if_null),"",value_if_null)));
 
 // Source: https://www.reddit.com/r/excel/comments/17ovi3x/comment/k85dtks/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 CALENDAR = LAMBDA(Year, Month, Day, [StartDay],
