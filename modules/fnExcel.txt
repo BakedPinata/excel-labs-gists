@@ -17,6 +17,9 @@ ISNULL = LAMBDA(value_to_check,LEN(value_to_check) = 0);
 
 IFNULL = LAMBDA(value_to_check,[value_if_null], IF(LEN(value_to_check) > 0, value_to_check, IF(ISOMITTED(value_if_null),"",value_if_null)));
 
+// Return a date value from a string value in the format 'dd/MM/yyy'
+DATEFROMSTRING = LAMBDA(date_string, DATE(RIGHT(date_string, 4), MID(date_string, 4, 2), LEFT(date_string, 2)));
+
 // Source: https://www.reddit.com/r/excel/comments/17ovi3x/comment/k85dtks/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 CALENDAR = LAMBDA(Year, Month, Day, [StartDay],
     LET(
