@@ -25,6 +25,7 @@ jobs:
 
   deploy:
     needs: prepare_deployments
+    if: ${{ needs.prepare_deployments.outputs.matrix != '' && needs.prepare_deployments.outputs.matrix != '[]' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
