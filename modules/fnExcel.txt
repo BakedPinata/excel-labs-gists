@@ -34,6 +34,20 @@ CALENDAR = LAMBDA(Year, Month, Day, [StartDay],
     )
 );
 
+// See https://learn.microsoft.com/en-us/troubleshoot/microsoft-365-apps/excel/determine-a-leap-year
+// Accepts date/datetime, date/datetime serial, year integer, date string and year string input formats
+ISLEAPYEAR = LAMBDA(input_value,
+  IF(
+    LEN(input_value) = 0,
+    "",
+    LET(
+      number_value, input_value * 1,
+      year_value, YEAR(IFS(number_value < 1, NA(), number_value > 4000, number_value, number_value <= 4000, DATE(number_value, 1, 1))),
+      OR(MOD(year_value, 400) = 0, AND(MOD(year_value, 4) = 0, MOD(year_value, 100) <> 0))
+    )
+  )
+)
+
 // Source: https://www.reddit.com/r/excel/comments/17ovi3x/comment/k85c1s9/?utm_source=share&utm_medium=web3x&utm_name=web3xcss&utm_term=1&utm_content=share_button
 SUBTITUTEALL = LAMBDA(Text_to_Change, Substitution_Table,
     LET(
