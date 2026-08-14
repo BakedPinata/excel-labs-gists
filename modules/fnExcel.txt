@@ -1,21 +1,37 @@
 /*
-fnExcel v0.1.0 - STANDARD EXCEL FUNCTION WRAPPERS
+fnExcel v0.2.0 - STANDARD EXCEL FUNCTION WRAPPERS
 GIST: https://gist.github.com/BakedPinata/13db435c0a4e2b461ea01ac648e517b4
 REPOSITORY: https://github.com/BakedPinata/excel-labs-gists
 AUTHOR: @BakedPinata
-TESTED: Microsoft Excel v2308
+TESTED: Microsoft Excel v2607
 */
 
-XLOOKUP = LAMBDA(lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode],
-    LET(
-        X, XLOOKUP(lookup_value, lookup_array, return_array, if_not_found, match_mode, search_mode),
-        IF(LEN(X) = 0, "", X)
-    )
+/*
+Description:  Checks if supplied value(s) have no length (empty)
+Notes:        values_to_check can be single value, row, column or 2D array of values
+              Optional check_all to require all values null (no effect if single value)
+Sources:      @BakedPinata
+*/
+ISNULL = LAMBDA(values_to_check, [check_all],
+  LET(
+    is_empty_array, MAP(values_to_check, LAMBDA(check_value, LEN(check_value) = 0)),
+    final_check_all, N(check_all)=1,
+    IF(final_check_all, AND(is_empty_array), OR(is_empty_array))
+  )
 );
 
-ISNULL = LAMBDA(value_to_check,LEN(value_to_check) = 0);
-
-IFNULL = LAMBDA(value_to_check,[value_if_null], IF(LEN(value_to_check) > 0, value_to_check, IF(ISOMITTED(value_if_null),"",value_if_null)));
+/*
+Description:  Returns supplied value if not empty
+Notes:        Option to specify alternate value, otherwise defaults to empty string
+              Useful for wrapping XLOOKUPs that return 0 instead of "" on returning an empty cell
+Sources:      @BakedPinata
+*/
+IFNULL = LAMBDA(value_to_check, [value_if_null],
+  IF(LEN(value_to_check) > 0,
+    value_to_check,
+    IF(ISOMITTED(value_if_null), "", value_if_null)
+  )
+);
 
 // Return a date value from a string value in the format 'dd/MM/yyy'
 DATEFROMSTRING = LAMBDA(date_string, DATE(RIGHT(date_string, 4), MID(date_string, 4, 2), LEFT(date_string, 2)));
